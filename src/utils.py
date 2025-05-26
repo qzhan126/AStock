@@ -2,26 +2,29 @@
 import json
 import csv
 
-def save_to_json(data, filename):
+# KLINE_CSV_HEADER defines the column headers for the K-line data CSV files.
+# These correspond to the fields returned by the Eastmoney API for historical stock data.
+KLINE_CSV_HEADER = ['日期', '开盘价', '收盘价', '最高价', '最低价', '成交量', '成交额', '振幅', '涨跌幅', '涨跌额', '换手率']
+
+def save_to_json(data: dict, filename: str):
     """
-    将数据保存到 JSON 文件
+    Saves the given data dictionary to a JSON file with UTF-8 encoding and indentation.
+
+    :param data: The dictionary containing data to be saved.
+    :param filename: The name of the file to save the JSON data to.
     """
     with open(filename, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
-def save_to_csv(data, filename):
+def save_to_csv(filepath: str, data: list[list[str]], header: list[str]):
     """
-    将数据保存到 CSV 文件
+    Saves the given tabular data to a CSV file with UTF-8 encoding.
+
+    :param filepath: The path to the CSV file to be created/overwritten.
+    :param data: A list of rows, where each row is a list of strings (cell values).
+    :param header: A list of strings representing the header row of the CSV file.
     """
-    with open(filename, 'w', encoding='utf-8', newline='') as f:
+    with open(filepath, 'w', encoding='utf-8', newline='') as f:
         writer = csv.writer(f)
-        # 写入表头
-        if data and data[list(data.keys())[0]] and data[list(data.keys())[0]]['data'] and data[list(data.keys())[0]]['data']['klines']:
-            header = data[list(data.keys())[0]]['data']['klines'][0].split(',')
-            writer.writerow(['股票代码'] + header)
-        # 写入数据
-        for code, history in data.items():
-            if history and history['data'] and history['data']['klines']:
-                for kline in history['data']['klines']:
-                    row = kline.split(',')
-                    writer.writerow([code] + row)
+        writer.writerow(header)
+        writer.writerows(data)
