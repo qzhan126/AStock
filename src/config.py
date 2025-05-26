@@ -1,11 +1,10 @@
 # config.py
 """
-Stores configuration variables for the application.
+存储应用程序的配置变量。
 
-This file centralizes settings like API endpoints or other global parameters
-that might need to be adjusted without modifying the core logic of the application.
+该文件集中管理API端点等设置或其他全局参数，
+这些参数可能需要调整而无需修改应用程序的核心逻辑。
 """
 
-# EASTMONEY_HISTORY_API_URL is the endpoint for fetching historical K-line data
-# from Eastmoney's services.
+# EASTMONEY_HISTORY_API_URL 是从东方财富服务获取历史K线数据的API端点。
 EASTMONEY_HISTORY_API_URL = "https://push2his.eastmoney.com/api/qt/stock/kline/get"

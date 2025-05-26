@@ -1,129 +1,136 @@
 """
-Example script to calculate the Relative Strength Index (RSI) for stocks
-from their historical data stored in CSV files.
+示例脚本：根据存储在CSV文件中的历史数据计算股票的相对强弱指数 (RSI)。
 
-This script demonstrates how to:
-- Load a list of stock codes from a JSON file ('data/all_stocks.json').
-- For each stock:
-    - Read its historical data from a CSV file located in 'data/stock_data/'.
-    - Calculate the RSI using a specified period (default 14 days).
-    - Print the latest RSI value.
-    - Identify and print stocks with an RSI value greater than 70 (a common overbought signal).
-- Handle potential errors like missing files or data issues.
+该脚本演示了如何：
+- 从JSON文件 ('data/all_stocks.json') 加载股票代码列表。
+- 对于每只股票：
+    - 从位于 'data/stock_data/' 目录下的CSV文件读取其历史数据。
+    - 使用指定的周期（默认为14天）计算RSI。
+    - 打印最新的RSI值。
+    - 识别并打印RSI值大于70（一个常见的超买信号）的股票。
+- 处理潜在错误，如文件丢失或数据问题。
 """
 import json
-# import csv # Not directly used, pandas handles CSV reading
+# import csv # 未直接使用，pandas负责CSV读取
 import pandas as pd
-import numpy as np # Used in calculate_rsi for NaN handling if extended
+import numpy as np # 如果扩展，calculate_rsi中用于NaN处理
 
-# --- Configuration ---
-STOCK_LIST_FILE = 'data/all_stocks.json'  # Path to the JSON file containing the list of stocks
-DATA_DIR = 'data/stock_data'             # Directory where individual stock CSV files are stored
-RSI_PERIOD = 14                          # Period for RSI calculation
-RSI_OVERBOUGHT_THRESHOLD = 70            # Threshold for identifying overbought stocks
+# --- 配置 ---
+DATA_ALL_STOCKS_FILE_PATH = 'data/all_stocks.json'  # 包含股票列表的JSON文件路径
+DATA_DIR = 'data/stock_data'             # 存储各个股票CSV文件的目录
+RSI_PERIOD = 14                          # RSI计算周期
+RSI_OVERBOUGHT_THRESHOLD = 70            # 用于识别超买股票的阈值
 
-# --- RSI Calculation Function ---
+# --- RSI计算函数 ---
 def calculate_rsi(data: pd.DataFrame, period: int = 14) -> pd.Series:
     """
-    Calculates the Relative Strength Index (RSI) for a given dataset.
+    为给定的数据集计算相对强弱指数 (RSI)。
 
-    :param data: Pandas DataFrame with a '收盘价' (Closing Price) column.
-    :param period: The period (number of days) to use for RSI calculation. Default is 14.
-    :return: Pandas Series containing the RSI values. The index will match the input DataFrame's index.
-             Returns an empty Series if '收盘价' is not found or if calculations fail.
+    :param data: Pandas DataFrame，包含 '收盘价' 列。
+    :param period: RSI计算使用的周期（天数）。默认为14。
+    :return: Pandas Series，包含RSI值。索引将与输入DataFrame的索引匹配。
+             如果找不到 '收盘价' 或计算失败，则返回空的Series。
     """
     if '收盘价' not in data.columns:
-        print("Error: '收盘价' (Closing Price) column not found in DataFrame.")
-        return pd.Series(dtype=float) # Return empty series if required column is missing
+        print("错误：DataFrame中未找到 '收盘价' 列。")
+        return pd.Series(dtype=float) # 如果缺少必需列，则返回空Series
 
     delta = data['收盘价'].diff()
     up, down = delta.copy(), delta.copy()
-    up[up < 0] = 0 # Gains
-    down[down > 0] = 0 # Losses (as positive values)
+    up[up < 0] = 0 # 上涨部分
+    down[down > 0] = 0 # 下跌部分 (以正数表示)
 
-    # Calculate the Exponential Moving Average (EMA) or Simple Moving Average (SMA)
-    # Using SMA here as per the original simple implementation:
+    # 计算指数移动平均 (EMA) 或简单移动平均 (SMA)
+    # 此处根据原始简单实现使用SMA：
     avg_gain = up.rolling(window=period, min_periods=1).mean()
     avg_loss = down.abs().rolling(window=period, min_periods=1).mean()
     
-    # Calculate Relative Strength (RS)
-    # Avoid division by zero if avg_loss is 0; RSI would be 100 in such cases.
+    # 计算相对强度 (RS)
+    # 如果avg_loss为0，避免除以零；在这种情况下，RSI为100。
     rs = avg_gain / avg_loss
-    rs = rs.replace([np.inf, -np.inf], np.nan) # Handle cases where avg_loss might be zero initially
-    rs = rs.fillna(method='bfill') # Backfill NaNs which can occur if avg_loss was 0 for some initial periods
+    rs = rs.replace([np.inf, -np.inf], np.nan) # 处理avg_loss最初可能为零的情况
+    rs = rs.fillna(method='bfill') # 回填因avg_loss在某些初始周期为0而可能出现的NaN
 
-    # Calculate RSI
+    # 计算RSI
     rsi = 100.0 - (100.0 / (1.0 + rs))
     
-    # For periods where avg_loss is 0 and avg_gain is positive, RSI should be 100.
-    # For periods where avg_gain is 0 and avg_loss is 0, RSI is often considered neutral (e.g. 50 or undefined).
-    # The formula 100 - (100 / (1 + RS)) handles RS -> infinity (avg_loss=0) correctly as RSI -> 100.
-    # If RS is 0 (avg_gain=0, avg_loss > 0), RSI is 0.
-    # If both are 0, RS is NaN, which we've tried to handle. If RS is 0/0 -> NaN, RSI will be NaN.
+    # 当avg_loss为0且avg_gain为正时，RSI应为100。
+    # 当avg_gain为0且avg_loss为0时，RSI通常被认为是中性的 (例如50或未定义)。
+    # 公式 100 - (100 / (1 + RS)) 能正确处理RS -> 无穷大 (avg_loss=0) 的情况，此时RSI -> 100。
+    # 如果RS为0 (avg_gain=0, avg_loss > 0)，则RSI为0。
+    # 如果两者均为0，RS为NaN，我们已尝试处理。如果RS为0/0 -> NaN，则RSI将为NaN。
     
     return rsi
 
-# --- Main script execution ---
+# --- 主脚本执行 ---
 
-# Load the list of stocks to process
+# 加载待处理的股票列表
+# 此脚本现在预期 'data/all_stocks.json' 是一个字典列表，
+# 每个字典都有 'code' 和 'name' 键。
+stock_list_to_process = []
 try:
-    with open(STOCK_LIST_FILE, 'r', encoding='utf-8') as f:
-        stock_list_full = json.load(f)
+    with open(DATA_ALL_STOCKS_FILE_PATH, 'r', encoding='utf-8') as f:
+        stock_list_to_process = json.load(f)
 except FileNotFoundError:
-    print(f"Error: '{STOCK_LIST_FILE}' not found. Ensure the file exists or you are running from the project root.")
-    stock_list_full = []
+    print(f"错误：`{DATA_ALL_STOCKS_FILE_PATH}` 未找到。请先运行 `examples/fetch_stock_data.py` 来生成该文件。")
+    exit(1) # 如果主股票列表不可用，则退出
+except json.JSONDecodeError:
+    print(f"错误：`{DATA_ALL_STOCKS_FILE_PATH}` 文件格式错误，无法解析JSON。")
+    exit(1)
 
-# Optional: Limit the number of stocks for processing (e.g., for testing)
-# stock_list_to_process = stock_list_full[:5] # Example: process only the first 5 stocks
-stock_list_to_process = stock_list_full
+# 可选：限制处理的股票数量 (例如，用于测试)
+# stock_list_to_process = stock_list_to_process[:5] # 示例：仅处理前5只股票
 
-print(f"Starting RSI calculation for {len(stock_list_to_process)} stocks...\n")
+print(f"开始为 {len(stock_list_to_process)} 只股票计算RSI...\n")
 
-# Iterate through each stock
+# 遍历每只股票
+# stock_info 预期为一个字典，例如 {'code': '000001', 'name': '平安银行'}
 for stock_info in stock_list_to_process:
-    stock_code = stock_info['stock_code']
-    print(f"--- Processing: {stock_code} ---")
+    stock_code = stock_info['code'] # 使用 'code' 键获取文件名和API调用所用的股票代码
+    stock_name = stock_info.get('name', stock_code) # 使用 'name' 键获取显示用的股票名称，如果缺失则回退到代码
     
-    # Construct the path to the stock's CSV data file
+    print(f"--- 正在处理: {stock_name} ({stock_code}) ---")
+    
+    # 构建股票CSV数据文件的路径（使用股票代码）
     csv_file_path = f'{DATA_DIR}/{stock_code}.csv'
     
     try:
-        # Read the historical stock data from the CSV file
+        # 从CSV文件读取历史股票数据
         df = pd.read_csv(csv_file_path, encoding='utf-8')
 
-        # Validate necessary data presence
+        # 验证必要数据是否存在
         if '收盘价' not in df.columns or df['收盘价'].isnull().all():
-            print(f"Warning for {stock_code}: '收盘价' (Closing Price) data is missing or all NaN. Skipping RSI calculation.")
+            print(f"警告 {stock_name} ({stock_code}): '收盘价' 数据缺失或全部为NaN。跳过RSI计算。")
             continue
         if len(df) < RSI_PERIOD:
-            print(f"Warning for {stock_code}: Insufficient data to calculate RSI for period {RSI_PERIOD} (have {len(df)} rows). Skipping.")
+            print(f"警告 {stock_name} ({stock_code}): 数据不足以计算周期为 {RSI_PERIOD} 的RSI (现有 {len(df)} 行)。跳过。")
             continue
 
-        # Calculate RSI using the defined function
+        # 使用定义的函数计算RSI
         df['RSI'] = calculate_rsi(df, period=RSI_PERIOD)
 
-        # Get the latest RSI value
+        # 获取最新的RSI值
         if df['RSI'].empty or pd.isna(df['RSI'].iloc[-1]):
-            print(f"Warning for {stock_code}: RSI calculation resulted in NaN or empty series. Last RSI value is unavailable.")
+            print(f"警告 {stock_name} ({stock_code}): RSI计算结果为NaN或空序列。最新的RSI值不可用。")
             continue
         
         last_rsi_value = df['RSI'].iloc[-1]
 
-        # Print the latest RSI value
-        print(f"{stock_code}: Latest RSI ({RSI_PERIOD}-day) = {last_rsi_value:.2f}")
+        # 打印最新的RSI值
+        print(f"{stock_name} ({stock_code}): 最新RSI ({RSI_PERIOD}日) = {last_rsi_value:.2f}")
 
-        # Check if the latest RSI value meets the overbought threshold
+        # 检查最新的RSI值是否达到超买阈值
         if last_rsi_value > RSI_OVERBOUGHT_THRESHOLD:
-            print(f"ALERT: {stock_code} RSI ({last_rsi_value:.2f}) is above the threshold of {RSI_OVERBOUGHT_THRESHOLD}.")
+            print(f"警报: {stock_name} ({stock_code}) RSI ({last_rsi_value:.2f}) 高于阈值 {RSI_OVERBOUGHT_THRESHOLD}。")
         else:
-            print(f"{stock_code} RSI ({last_rsi_value:.2f}) is not above the threshold.")
+            print(f"{stock_name} ({stock_code}) RSI ({last_rsi_value:.2f}) 未高于阈值。")
 
     except FileNotFoundError:
-        print(f"Error: Data file not found for {stock_code} at '{csv_file_path}'. Please ensure `fetch_stock_data.py` has been run.")
+        print(f"错误: 未找到 {stock_name} ({stock_code}) 的数据文件于 '{csv_file_path}'。请确保已为该股票运行 `fetch_stock_data.py`。")
     except Exception as e:
-        # Catch any other unexpected errors during processing for a specific stock
-        print(f"An unexpected error occurred while processing {stock_code}: {e}")
+        # 捕获处理特定股票时可能发生的任何其他意外错误
+        print(f"处理 {stock_name} ({stock_code}) 时发生意外错误: {e}")
     
-    print("-" * 30) # Separator for readability
+    print("-" * 30) # 分隔符，提高可读性
 
-print("\nRSI calculation process completed for all specified stocks.")
+print("\n所有指定股票的RSI计算过程已完成。")
