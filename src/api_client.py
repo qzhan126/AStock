@@ -29,10 +29,10 @@ def fetch_stock_list():
              如果发生错误则返回None。
     """
     try:
-        # ak.stock_zh_stock_name_all() 返回一个包含 'code', 'name' 等列的DataFrame
-        stock_df = ak.stock_zh_stock_name_all()
+        # ak.stock_info_a_code_name() 返回一个包含 'code', 'name' 等列的DataFrame
+        stock_df = ak.stock_info_a_code_name()
         # 将DataFrame转换为字典列表
-        # 根据典型的akshare输出，使用 'code' 作为 stock_code，'name' 作为 stock_name
+        # 假设 stock_df 包含 'code' 和 'name' 列
         stock_list = stock_df[['code', 'name']].to_dict(orient='records')
         return stock_list
     except Exception as e:
